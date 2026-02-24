@@ -1,159 +1,189 @@
 import streamlit as st
 import pandas as pd
-import plotly.graph_objects as go
-import numpy as np
-
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image, Table, TableStyle
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image
+from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib import colors
-from reportlab.lib.pagesizes import letter
 from reportlab.lib.units import inch
-from reportlab.lib.enums import TA_CENTER
-from datetime import datetime
-import io
-import os
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.pdfbase import pdfmetrics
+from reportlab.platypus import Table, TableStyle
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.pdfbase.pdfmetrics import stringWidth
 
-# =============================
-# CONFIGURACIÓN
-# =============================
+# ======================================
+# CONFIGURACIÓN GENERAL
+# ======================================
 
-st.set_page_config(page_title="LUSANTA Cotizador", layout="wide")
+st.set_page_config(page_title="Cotizador Lusanta 2026", layout="wide")
 
-st.title("☀️ LUSANTA | Cotizador Inteligente Premium")
+st.title("🏢 Cotizador Oficial Lusanta 2026")
+
+# ======================================
+# CARGAR EXCEL
+# ======================================
+
+@st.cache_data
+def cargar_datos():
+    df = pd.read_excel("LISTA_DE_PRECIOS_2026.xlsx")
+    return df
+
+df = cargar_datos()
+
+# ======================================
+# SELECCIÓN DE DEPARTAMENTO
+# ======================================
+
+st.subheader("Selección de Departamento")
+
+torre = st.selectbox("Selecciona Torre", sorted(df["Torre"].unique()))
+df_torre = df[df["Torre"] == torre]
+
+nivel = st.selectbox("Selecciona Nivel", sorted(df_torre["Nivel"].unique()))
+df_nivel = df_torre[df_torre["Nivel"] == nivel]
+
+modelo = st.selectbox("Selecciona Modelo", sorted(df_nivel["Modelo"].unique()))
+df_modelo = df_nivel[df_nivel["Modelo"] == modelo]
+
+unidad = st.selectbox("Selecciona Unidad", df_modelo["Unidad"])
+fila = df_modelo[df_modelo["Unidad"] == unidad].iloc[0]
+
+# Datos automáticos
+metros = fila["Totales M2"]
+precio_lusanta = fila["Precio"]
+precio_m2_lusanta = fila["Precio x m2"]
+recamaras = fila["Rec"]
+banos = fila["Baños"]
+vista = fila["Vista"]
+interior = fila["Interior m2"]
+terraza = fila["Teraza m2"]
 
 st.divider()
 
-# =============================
-# INPUTS
-# =============================
-
 col1, col2, col3 = st.columns(3)
+col1.metric("Metros Totales", f"{metros} m²")
+col2.metric("Precio Total", f"${precio_lusanta:,.0f}")
+col3.metric("Precio por m²", f"${precio_m2_lusanta:,.0f}")
 
-with col1:
-    precio_m2_lusanta = st.number_input("Precio m² Lusanta Hoy", value=32000)
+col4, col5, col6 = st.columns(3)
+col4.metric("Recámaras", recamaras)
+col5.metric("Baños", banos)
+col6.metric("Vista", vista)
 
-with col2:
-    precio_m2_torre3 = st.number_input("Precio m² Torre 3 (Estimado)", value=48000)
+col7, col8 = st.columns(2)
+col7.metric("Interior m²", interior)
+col8.metric("Terraza m²", terraza)
 
-with col3:
-    metros = st.number_input("Metros del Departamento", value=102)
+# ======================================
+# COMPARATIVO VS TORRE 3
+# ======================================
 
-renta_mensual = st.number_input("Renta mensual estimada", value=23000)
+st.divider()
+st.subheader("Comparativo de Plusvalía vs Torre 3")
 
-# =============================
-# CÁLCULOS
-# =============================
-
-precio_lusanta = precio_m2_lusanta * metros
-precio_torre3 = precio_m2_torre3 * metros
+precio_m2_torre3 = 48000
+precio_torre3 = metros * precio_m2_torre3
 diferencia_precio = precio_torre3 - precio_lusanta
 
-# =============================
+colA, colB, colC = st.columns(3)
+colA.metric("Precio Lusanta Hoy", f"${precio_lusanta:,.0f}")
+colB.metric("Valor Proyectado Torre 3", f"${precio_torre3:,.0f}")
+colC.metric("Plusvalía Proyectada", f"${diferencia_precio:,.0f}")
+
+# ======================================
 # SIMULADOR HIPOTECARIO
-# =============================
+# ======================================
 
-st.subheader("🏦 Simulador Hipotecario")
+st.divider()
+st.subheader("Simulador Hipotecario")
 
-enganche_pct = st.slider("Enganche (%)", 10, 50, 20)
-tasa_anual = st.number_input("Tasa anual (%)", value=10.5)
-plazo_años = st.selectbox("Plazo (años)", [10, 15, 20, 25, 30], index=2)
+enganche_pct = st.slider("Porcentaje de Enganche", 10, 50, 20)
+tasa = st.slider("Tasa de interés anual (%)", 5.0, 15.0, 10.5)
+plazo = st.selectbox("Plazo (años)", [10, 15, 20, 25])
 
 enganche = precio_lusanta * (enganche_pct / 100)
-monto_credito = precio_lusanta - enganche
+credito = precio_lusanta - enganche
 
-tasa_mensual = (tasa_anual / 100) / 12
-num_pagos = plazo_años * 12
+tasa_mensual = tasa / 100 / 12
+num_pagos = plazo * 12
 
-mensualidad = monto_credito * (
+mensualidad = credito * (
     tasa_mensual * (1 + tasa_mensual) ** num_pagos
 ) / ((1 + tasa_mensual) ** num_pagos - 1)
 
-total_pagado = mensualidad * num_pagos
-intereses_totales = total_pagado - monto_credito
+colX, colY, colZ = st.columns(3)
+colX.metric("Enganche", f"${enganche:,.0f}")
+colY.metric("Monto de Crédito", f"${credito:,.0f}")
+colZ.metric("Mensualidad Aproximada", f"${mensualidad:,.0f}")
 
-flujo_mensual = renta_mensual - mensualidad
-
-# =============================
-# MOSTRAR RESULTADOS
-# =============================
-
-st.divider()
-st.subheader("📊 Resultados")
-
-colA, colB, colC = st.columns(3)
-
-colA.metric("Precio Lusanta", f"${precio_lusanta:,.0f}")
-colB.metric("Valor Torre 3", f"${precio_torre3:,.0f}")
-colC.metric("Ganancia Potencial", f"${diferencia_precio:,.0f}")
-
-# =============================
-# GENERADOR PDF
-# =============================
+# ======================================
+# GENERADOR DE PDF PERSONALIZADO
+# ======================================
 
 st.divider()
-st.subheader("📄 Generar Propuesta Personalizada")
+st.subheader("Generar Propuesta en PDF")
 
 nombre_cliente = st.text_input("Nombre del Cliente")
 
-if st.button("Generar PDF Personalizado"):
+def generar_pdf():
+    doc = SimpleDocTemplate("Propuesta_Lusanta.pdf", pagesize=letter)
+    elementos = []
 
-    buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=letter)
-    elements = []
+    estilos = getSampleStyleSheet()
+    estilo_titulo = estilos["Heading1"]
+    estilo_normal = estilos["Normal"]
 
-    styles = getSampleStyleSheet()
-    normal = styles["Normal"]
+    # Logo
+    logo = Image("logotipo lusanta_Mesa de trabajo 1.png", width=2.5*inch, height=1*inch)
+    elementos.append(logo)
+    elementos.append(Spacer(1, 20))
 
-    centered_style = ParagraphStyle(
-        name='Centered',
-        parent=styles['Normal'],
-        alignment=TA_CENTER
-    )
+    elementos.append(Paragraph(f"Propuesta Personalizada para {nombre_cliente}", estilo_titulo))
+    elementos.append(Spacer(1, 20))
 
-    fecha = datetime.now().strftime("%d/%m/%Y")
-
-    # LOGO
-    logo_path = "logo_lusanta.png"
-
-    if os.path.exists(logo_path):
-        logo = Image(logo_path, width=2.8*inch, height=1.2*inch)
-        logo.hAlign = 'CENTER'
-        elements.append(logo)
-        elements.append(Spacer(1, 0.4 * inch))
-
-    elements.append(Paragraph("<b>Propuesta de Inversión</b>", centered_style))
-    elements.append(Spacer(1, 0.3 * inch))
-    elements.append(Paragraph(f"Cliente: {nombre_cliente}", normal))
-    elements.append(Paragraph(f"Fecha: {fecha}", normal))
-    elements.append(Spacer(1, 0.5 * inch))
-
-    data = [
-        ["Concepto", "Monto"],
-        ["Precio Lusanta Hoy", f"${precio_lusanta:,.0f}"],
-        ["Valor Proyectado Torre 3", f"${precio_torre3:,.0f}"],
-        ["Ganancia Potencial", f"${diferencia_precio:,.0f}"],
+    datos = [
+        ["Torre", torre],
+        ["Nivel", nivel],
+        ["Unidad", unidad],
+        ["Modelo", modelo],
+        ["Metros Totales", f"{metros} m²"],
+        ["Interior", f"{interior} m²"],
+        ["Terraza", f"{terraza} m²"],
+        ["Recámaras", recamaras],
+        ["Baños", banos],
+        ["Vista", vista],
+        ["Precio Total", f"${precio_lusanta:,.0f}"],
+        ["Plusvalía Proyectada", f"${diferencia_precio:,.0f}"],
         ["Enganche", f"${enganche:,.0f}"],
         ["Mensualidad Estimada", f"${mensualidad:,.0f}"],
-        ["Intereses Totales", f"${intereses_totales:,.0f}"],
-        ["Flujo Mensual Estimado", f"${flujo_mensual:,.0f}"],
     ]
 
-    table = Table(data, colWidths=[3.2 * inch, 2 * inch])
-    table.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#F4F4F4")),
-        ("GRID", (0, 0), (-1, -1), 0.4, colors.grey),
-        ("ALIGN", (1, 1), (-1, -1), "RIGHT"),
+    tabla = Table(datos, colWidths=[2.5*inch, 3*inch])
+    tabla.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), colors.white),
+        ('GRID', (0,0), (-1,-1), 0.5, colors.grey),
+        ('FONTNAME', (0,0), (-1,-1), 'Helvetica'),
+        ('FONTSIZE', (0,0), (-1,-1), 10),
+        ('LEFTPADDING', (0,0), (-1,-1), 8),
+        ('RIGHTPADDING', (0,0), (-1,-1), 8),
+        ('TOPPADDING', (0,0), (-1,-1), 6),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 6),
     ]))
 
-    elements.append(table)
-    elements.append(Spacer(1, 0.6 * inch))
+    elementos.append(tabla)
 
-    doc.build(elements)
-    buffer.seek(0)
+    doc.build(elementos)
 
-    st.download_button(
-        label="Descargar Propuesta PDF",
-        data=buffer,
-        file_name=f"Propuesta_Lusanta_{nombre_cliente}.pdf",
-        mime="application/pdf"
-    )
+if st.button("Generar PDF"):
+    if nombre_cliente:
+        generar_pdf()
+        with open("Propuesta_Lusanta.pdf", "rb") as file:
+            st.download_button(
+                label="Descargar PDF",
+                data=file,
+                file_name=f"Propuesta_Lusanta_{nombre_cliente}.pdf",
+                mime="application/pdf"
+            )
+    else:
+        st.warning("Por favor escribe el nombre del cliente.")
+
