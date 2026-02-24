@@ -134,7 +134,7 @@ def generar_pdf():
     estilo_normal = estilos["Normal"]
 
     # Logo
-    logo = Image("logotipo lusanta_Mesa de trabajo 1.png", width=2.5*inch, height=1*inch)
+    logo = Image("logo_lusanta.png", width=2.5*inch, height=1*inch)
     elementos.append(logo)
     elementos.append(Spacer(1, 20))
 
@@ -186,4 +186,5 @@ if st.button("Generar PDF"):
             )
     else:
         st.warning("Por favor escribe el nombre del cliente.")
+
 
