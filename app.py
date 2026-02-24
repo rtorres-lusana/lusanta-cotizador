@@ -1,3 +1,8 @@
+import streamlit as st
+import pandas as pd
+import plotly.graph_objects as go
+import numpy as np
+
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image, Table, TableStyle
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
@@ -101,3 +106,4 @@ Es la confirmación del valor que puede capturar hoy en Lusanta.
         file_name=f"Propuesta_Lusanta_{nombre_cliente}.pdf",
         mime="application/pdf"
     )
+
