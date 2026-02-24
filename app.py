@@ -13,6 +13,83 @@ from datetime import datetime
 import io
 import os
 
+# =============================
+# CONFIGURACIÓN
+# =============================
+
+st.set_page_config(page_title="LUSANTA Cotizador", layout="wide")
+
+st.title("☀️ LUSANTA | Cotizador Inteligente Premium")
+
+st.divider()
+
+# =============================
+# INPUTS
+# =============================
+
+col1, col2, col3 = st.columns(3)
+
+with col1:
+    precio_m2_lusanta = st.number_input("Precio m² Lusanta Hoy", value=32000)
+
+with col2:
+    precio_m2_torre3 = st.number_input("Precio m² Torre 3 (Estimado)", value=48000)
+
+with col3:
+    metros = st.number_input("Metros del Departamento", value=102)
+
+renta_mensual = st.number_input("Renta mensual estimada", value=23000)
+
+# =============================
+# CÁLCULOS
+# =============================
+
+precio_lusanta = precio_m2_lusanta * metros
+precio_torre3 = precio_m2_torre3 * metros
+diferencia_precio = precio_torre3 - precio_lusanta
+
+# =============================
+# SIMULADOR HIPOTECARIO
+# =============================
+
+st.subheader("🏦 Simulador Hipotecario")
+
+enganche_pct = st.slider("Enganche (%)", 10, 50, 20)
+tasa_anual = st.number_input("Tasa anual (%)", value=10.5)
+plazo_años = st.selectbox("Plazo (años)", [10, 15, 20, 25, 30], index=2)
+
+enganche = precio_lusanta * (enganche_pct / 100)
+monto_credito = precio_lusanta - enganche
+
+tasa_mensual = (tasa_anual / 100) / 12
+num_pagos = plazo_años * 12
+
+mensualidad = monto_credito * (
+    tasa_mensual * (1 + tasa_mensual) ** num_pagos
+) / ((1 + tasa_mensual) ** num_pagos - 1)
+
+total_pagado = mensualidad * num_pagos
+intereses_totales = total_pagado - monto_credito
+
+flujo_mensual = renta_mensual - mensualidad
+
+# =============================
+# MOSTRAR RESULTADOS
+# =============================
+
+st.divider()
+st.subheader("📊 Resultados")
+
+colA, colB, colC = st.columns(3)
+
+colA.metric("Precio Lusanta", f"${precio_lusanta:,.0f}")
+colB.metric("Valor Torre 3", f"${precio_torre3:,.0f}")
+colC.metric("Ganancia Potencial", f"${diferencia_precio:,.0f}")
+
+# =============================
+# GENERADOR PDF
+# =============================
+
 st.divider()
 st.subheader("📄 Generar Propuesta Personalizada")
 
@@ -35,11 +112,8 @@ if st.button("Generar PDF Personalizado"):
 
     fecha = datetime.now().strftime("%d/%m/%Y")
 
-    # ==========================
-    # LOGO LUSANTA
-    # ==========================
-    
-    logo_path = "logotipo lusanta_Mesa de trabajo 1.png"
+    # LOGO
+    logo_path = "logo_lusanta.png"
 
     if os.path.exists(logo_path):
         logo = Image(logo_path, width=2.8*inch, height=1.2*inch)
@@ -47,19 +121,11 @@ if st.button("Generar PDF Personalizado"):
         elements.append(logo)
         elements.append(Spacer(1, 0.4 * inch))
 
-    # ==========================
-    # ENCABEZADO
-    # ==========================
-
     elements.append(Paragraph("<b>Propuesta de Inversión</b>", centered_style))
-    elements.append(Spacer(1, 0.2 * inch))
+    elements.append(Spacer(1, 0.3 * inch))
     elements.append(Paragraph(f"Cliente: {nombre_cliente}", normal))
     elements.append(Paragraph(f"Fecha: {fecha}", normal))
     elements.append(Spacer(1, 0.5 * inch))
-
-    # ==========================
-    # TABLA FINANCIERA
-    # ==========================
 
     data = [
         ["Concepto", "Monto"],
@@ -77,25 +143,10 @@ if st.button("Generar PDF Personalizado"):
         ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#F4F4F4")),
         ("GRID", (0, 0), (-1, -1), 0.4, colors.grey),
         ("ALIGN", (1, 1), (-1, -1), "RIGHT"),
-        ("FONTNAME", (0, 0), (-1, -1), "Helvetica"),
     ]))
 
     elements.append(table)
     elements.append(Spacer(1, 0.6 * inch))
-
-    # ==========================
-    # CONCLUSIÓN
-    # ==========================
-
-    conclusion = f"""
-Comprar hoy permite capturar aproximadamente ${diferencia_precio:,.0f} de plusvalía proyectada.
-Esperar podría representar un impacto financiero relevante considerando el incremento de precio y renta no generada.
-
-Torre 3 no es la oportunidad.
-Es la confirmación del valor que puede capturar hoy en Lusanta.
-"""
-
-    elements.append(Paragraph(conclusion, normal))
 
     doc.build(elements)
     buffer.seek(0)
@@ -106,4 +157,3 @@ Es la confirmación del valor que puede capturar hoy en Lusanta.
         file_name=f"Propuesta_Lusanta_{nombre_cliente}.pdf",
         mime="application/pdf"
     )
-
